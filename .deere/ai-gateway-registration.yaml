@@ -8,11 +8,11 @@ content:
     compliance:
       generativeAITermsOfUseRevision: APR2025 # See https://data.deere.com/ai/legal to make sure you understand the terms of use.
       compliesWithGenerativeAITermsOfUse: yes
-    description:  Use AI to author DTCs # verbose description of your application and usage of AI for data processing.
+    description:  Use AI to author DTCs. We will use AI to processing information from code to generate DTCs automatically, which will speed up the process for the support. # verbose description of your application and usage of AI for data processing.
     maxGicpClassification: Company Use # highest level of GICP you plan to use with AI.
     oauthConfigs:
       - oauthClientId: 0oa2h7ar68uX39jBn0h8 # the Okta client ID you created for your application.
-        oauthDomain: sso.johndeere.com
+        oauthDomain: sso-dev.johndeere.com
     owners:
       - email: melogustavor@johndeere.com
     providers:
