@@ -1,0 +1,4 @@
+{
+  "settingsInheritedFrom": "JohnDeere-Tech/whitesource-config@main",
+  "remediateSettings": {"enableRenovate": true}
+}
