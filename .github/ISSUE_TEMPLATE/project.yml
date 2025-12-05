@@ -1,0 +1,46 @@
+
+name: "Project"
+description: "Creates a project with Phases and Tasks"
+title: "[Project] {project_name}"
+labels: ["type:project", "planning"]
+body:
+  - type: input
+    id: project_name
+    attributes:
+      label: Project name
+      placeholder: "Ex.: Data Lake Migration"
+    validations:
+      required: true
+  - type: textarea
+    id: phases
+    attributes:
+      label: Phases standard (one per line)
+      placeholder: |
+        P1 - Charter Creation and Project Kickoff
+        P2 - Insight Gathering
+        P3 - Insight Review
+        P4 - Analytics & Integration Project Handoff Meeting
+        P5 - Analytics Work
+        P6 - Integration Work
+        P7 - PoC Design Review: Product and Integration
+        P8 - Analytics Work for Production
+        P9 - Integration
+        PR - Recognition
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Standard tasks (one per line, applied to each Phase)
+      placeholder: |
+        Kickoff
+        Requirements
+        Implementation
+        Testing
+        Documentation
+    validations:
+      required: true
+  - type: input
+    id: assignee
+    attributes:
+      label: Initial assignee (GitHub login)
