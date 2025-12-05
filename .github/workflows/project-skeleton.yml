@@ -1,0 +1,105 @@
+
+name: Create Project Issue Structure
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  build-structure:
+    if: >
+      contains(github.event.issue.labels.*.name, 'type:project')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (para ler arquivos de estrutura)
+        uses: actions/checkout@v4
+
+      - name: Instalar gh CLI
+        uses: cli/gh-actions/install-gh@v1
+
+      - name: Logar no GitHub (usa GITHUB_TOKEN)
+        run: gh auth setup-git
+
+      - name: Preparar variáveis
+        id: prep
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          REPO="${{ github.repository }}"
+          TITLE="${{ github.event.issue.title }}"
+          # Carrega do form (payload) ou do arquivo
+          PHASES="$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | awk '/Phases/ {flag=1;next} /Tasks padrão/ {flag=0} flag')"
+          TASKS="$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | awk '/Tasks padrão/ {flag=1;next} /^$/ {flag=0} flag')"
+
+          if [ -z "$PHASES" ] || [ -z "$TASKS" ]; then
+            PHASES="$(yq -r '.phases[]' .github/issue-structure.yml)"
+            TASKS="$(yq -r '.tasks[]'  .github/issue-structure.yml)"
+          fi
+
+          echo "phases<<EOF" >> $GITHUB_OUTPUT
+          echo "$PHASES"        >> $GITHUB_OUTPUT
+          echo "EOF"             >> $GITHUB_OUTPUT
+
+          echo "tasks<<EOF"  >> $GITHUB_OUTPUT
+          echo "$TASKS"      >> $GITHUB_OUTPUT
+          echo "EOF"          >> $GITHUB_OUTPUT
+
+          echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "repo=$REPO"                 >> $GITHUB_OUTPUT
+
+      - name: Criar Phases (issues filhos)
+        id: create_phases
+        run: |
+          REPO="${{ steps.prep.outputs.repo }}"
+          PARENT="${{ steps.prep.outputs.issue_number }}"
+          mapfile -t PHASES < <(printf "%s\n" "${{ steps.prep.outputs.phases }}")
+          echo "" > phases_map.txt
+
+          for PH in "${PHASES[@]}"; do
+            PHASE_NUM=$(gh issue create \
+              --repo "$REPO" \
+              --title "[Phase] $PH" \
+              --label "phase" \
+              --body "Phase do projeto: #$PARENT" \
+              --json number \
+              | jq -r '.number')
+
+            echo "$PH:$PHASE_NUM" >> phases_map.txt
+          done
+
+          echo "phases_map<<EOF" >> $GITHUB_OUTPUT
+          cat phases_map.txt       >> $GITHUB_OUTPUT
+          echo "EOF"               >> $GITHUB_OUTPUT
+
+      - name: Criar Tasks para cada Phase
+        run: |
+          REPO="${{ steps.prep.outputs.repo }}"
+          mapfile -t TASKS < <(printf "%s\n" "${{ steps.prep.outputs.tasks }}")
+          while IFS=':' read -r PH_NAME PH_NUM; do
+            for TK in "${TASKS[@]}"; do
+              TASK_NUM=$(gh issue create \
+                --repo "$REPO" \
+                --title "[Task] $PH_NAME - $TK" \
+                --label "task" \
+                --body "Task da phase: #$PH_NUM" \
+                --json number | jq -r '.number')
+
+              # Relacionar via issue task list na Phase
+              gh issue edit "$PH_NUM" --repo "$REPO" --add-body "- [ ] #$TASK_NUM"
+            done
+          done < phases_map.txt
+
+      - name: Montar task list no issue Projeto (referenciando Phases)
+        run: |
+          REPO="${{ steps.prep.outputs.repo }}"
+          PARENT="${{ steps.prep.outputs.issue_number }}"
+          BODY="### Phases\n"
+          while IFS=':' read -r PH_NAME PH_NUM; do
+            BODY+="- [ ] #$PH_NUM ($PH_NAME)\n"
+          done < phases_map.txt
+
+          gh issue edit "$PARENT" --repo "$REPO" --add-body "$BODY"
