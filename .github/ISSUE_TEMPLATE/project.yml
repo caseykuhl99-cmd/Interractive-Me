@@ -6,7 +6,6 @@ labels: ["opportunity", "project"]
 assignees:
   - HP6NTKB_deere
   - fl40274_deere
-milestone: "Project Name"
 body:
   - type: markdown
     attributes:
@@ -44,8 +43,8 @@ body:
     id: reasoning
     attributes:
       label: "Reasoning"
-      description: "Explain the reason"
-      placeholder: "Why is this important?"
+      description: "Explain the reasoning behind this opportunity"
+      placeholder: "Why is this opportunity important?"
     validations:
       required: true
 
@@ -53,7 +52,7 @@ body:
     id: focus_group
     attributes:
       label: "Focus Group"
-      description: "Focus group"
+      description: "Which team or group will focus on this opportunity?"
       placeholder: "e.g., Data team"
     validations:
       required: false
