@@ -1,0 +1,8 @@
+# .github/ISSUE_TEMPLATE/config.yml
+blank_issues_enabled: true   # hide "Open a blank issue"; force use of templates
+contact_links:
+  - name: Project board
+    url: https://github.com/orgs/JohnDeere-Tech/projects/473
+    about: Track issues and their status in the project board.
+
+
