@@ -14,16 +14,6 @@ on:
       - main
 
   workflow_dispatch:
-    inputs:
-      ambiente:
-        description: "Ambiente (dev/stage/prod)"
-        type: choice
-        options: [dev, stage, prod]
-        required: true
-      dry_run:
-        description: "Executar em modo simulado?"
-        type: boolean
-        default: true
 
 permissions:
   issues: write
