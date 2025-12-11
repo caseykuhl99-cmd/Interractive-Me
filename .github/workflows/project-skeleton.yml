@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   build-structure:
-    if: contains(toJson(github.event.issue.labels.*.name), 'project')
+    if: github.event_name == 'issues' && contains(toJson(github.event.issue.labels.*.name), 'project')
     runs-on: ubuntu-latest
 
     steps:
