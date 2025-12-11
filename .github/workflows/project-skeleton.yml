@@ -7,11 +7,11 @@ on:
 
   push:
     branches:
-      - fix/template
+      - main
 
   pull_request:
     branches:
-      - fix/template
+      - main
 
   workflow_dispatch:
     inputs:
