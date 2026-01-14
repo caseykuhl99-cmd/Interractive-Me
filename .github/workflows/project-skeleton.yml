@@ -95,12 +95,16 @@ jobs:
           while IFS= read -r PH; do
             if [ -n "$PH" ]; then
               echo "Creating phase: $PH"
-              PHASE_NUM=$(gh issue create \
+              PHASE_URL=$(gh issue create \
                 --repo "$REPO" \
                 --title "[Phase] $PH" \
                 --label "phase" \
-                --body "Phase of project #$PARENT" \
-                | grep -oP '#\K[0-9]+' | head -1)
+                --body "**Parent Project:** #$PARENT"$'\n\n'"### Tasks"$'\n'"This phase includes the following tasks:")
+              
+              PHASE_NUM=$(echo "$PHASE_URL" | grep -oP '[0-9]+$')
+              
+              # Link phase as development item to parent
+              gh issue develop "$PARENT" --repo "$REPO" --issue-repo "$REPO" "$PHASE_NUM" || true
               
               echo "$PH|$PHASE_NUM" >> phases_map.txt
               echo "Created phase #$PHASE_NUM: $PH"
@@ -134,58 +138,68 @@ jobs:
                   # Get tasks for this phase
                   PHASE_TASKS=$(grep "^$PHASE_ID|" phase_tasks.txt | cut -d'|' -f2-)
                   
+                  # Build tasklist for this phase
+                  TASK_LIST=""
                   IFS='|' read -ra TASKS <<< "$PHASE_TASKS"
                   for TK in "${TASKS[@]}"; do
                     if [ -n "$TK" ]; then
                       echo "Creating task: $TK"
-                      CREATE_OUTPUT=$(gh issue create \
+                      TASK_URL=$(gh issue create \
                         --repo "$REPO" \
                         --title "[Task] $PHASE_ID - $TK" \
                         --label "task" \
-                        --body "Task for phase #$PH_NUM")
-                      TASK_NUM=$(gh issue create \
-                        --repo "$REPO" \
-                        --title "[Task] $PHASE_ID - $TK" \
-                        --label "task" \
-                        --body "Task for phase #$PH_NUM" \
-                        | grep -oP '#\K[0-9]+' | head -1)
-                        
-                      # Show full gh CLI output for debugging 
-                      echo "gh issue create output: $CREATE_OUTPUT"
-                      # Extract the task number from output (if possible)
-                      TASK_NUM=$(echo "$CREATE_OUTPUT" | grep -oP '#\K[0-9]+' | head -1)
-
-                      echo "Created task #$TASK_NUM"
-                      # Only comment if task number was successfully created
+                        --body "**Parent Phase:** #$PH_NUM"$'\n\n'"$TK")
+                      
+                      # Extract the task number from the URL
+                      TASK_NUM=$(echo "$TASK_URL" | grep -oP '[0-9]+$')
+                      
+                      echo "Created task #$TASK_NUM: $TK"
+                      
                       if [ -n "$TASK_NUM" ]; then
-                        gh issue comment "$PH_NUM" --repo "$REPO" --body "- [ ] #$TASK_NUM $TK"
+                        # Link task as development item to phase
+                        gh issue develop "$PH_NUM" --repo "$REPO" --issue-repo "$REPO" "$TASK_NUM" || true
+                        
+                        # Add to tasklist
+                        TASK_LIST+="- [ ] #$TASK_NUM $TK"$'\n'
                       else
-                        echo "Task was not created correctly, skipping comment."
+                        echo "Task was not created correctly, skipping."
                       fi
-                                            
-                      # Add task to phase's task list
-                      gh issue comment "$PH_NUM" --repo "$REPO" --body "- [ ] #$TASK_NUM $TK"
                     fi
                   done
+                  
+                  # Update phase issue with tasklist in body
+                  if [ -n "$TASK_LIST" ]; then
+                    PHASE_BODY="**Parent Project:** #${{ steps.prep.outputs.issue_number }}"$'\n\n'
+                    PHASE_BODY+="### Tasks"$'\n'
+                    PHASE_BODY+="$TASK_LIST"
+                    echo "$PHASE_BODY" | gh issue edit "$PH_NUM" --repo "$REPO" --body-file -
+                  fi
                 else
                   echo "No standard tasks for phase #$PH_NUM: $PH_NAME"
                 fi
               fi
           done < phases_map.txt
           cat phases_map.txt
-      - name: Add phase checklist to parent project issue
+      - name: Update parent project issue with phase tasklist
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PARENT="${{ steps.prep.outputs.issue_number }}"
           
-          BODY="### Project Phases"$'\n'
+          # Get current issue body
+          CURRENT_BODY=$(gh issue view "$PARENT" --repo "$REPO" --json body --jq .body)
+          
+          # Build phase tasklist
+          PHASE_LIST="### Project Phases"$'\n'
           while IFS='|' read -r PH_NAME PH_NUM; do
             if [ -n "$PH_NAME" ] && [ -n "$PH_NUM" ]; then
-              BODY+="- [ ] #$PH_NUM - $PH_NAME"$'\n'
+              PHASE_LIST+="- [ ] #$PH_NUM - $PH_NAME"$'\n'
             fi
           done < phases_map.txt
           
-          gh issue comment "$PARENT" --repo "$REPO" --body "$BODY"
+          # Append phase list to existing body
+          NEW_BODY="$CURRENT_BODY"$'\n\n'"$PHASE_LIST"
+          
+          echo "$NEW_BODY" | gh issue edit "$PARENT" --repo "$REPO" --body-file -
           echo "Project structure created successfully!"
