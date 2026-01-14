@@ -1,22 +1,23 @@
-
-name: "Opportunity Template"
-description: "Template for opportunity issues"
-title: "[Opportunity] Opportunity title"
-labels: ["opportunity", "project"]
+name: "Project Template"
+description: "Template for new projects"
+title: "[Project]: <Enter project name here>"
+labels: ["project"]
 assignees:
   - HP6NTKB_deere
   - fl40274_deere
+  - rp32809_deere
+  - tc00531_deere
 body:
   - type: markdown
     attributes:
       value: |
         Please fill in the fields below:
 
-  - type: input
-    id: opportunity_statement
+  - type: textarea
+    id: "opportunity_statement"
     attributes:
       label: "Opportunity Statement"
-      description: "Describe the opportunity"
+      description: "Enter description of the opportunity"
       placeholder: "e.g., Improve process X"
     validations:
       required: true
@@ -30,12 +31,12 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: hours_unlocked
+  - type: textarea
+    id: hours_unlocked_by_role
     attributes:
       label: "Hours Unlocked per Year"
-      description: "How many hours will be unlocked per year?"
-      placeholder: "e.g., 120"
+      description: "Enter the hours unlocked per year for each role"
+      placeholder: "e.g., PL: 120, LTIS: 80, Engineer: 150"
     validations:
       required: true
 

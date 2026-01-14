@@ -3,103 +3,157 @@ name: Create Project Issue Structure
 
 on:
   issues:
-    types: [opened]
+    types: [opened, reopened]
+
+  workflow_dispatch:
 
 permissions:
   issues: write
   contents: read
 
+
 jobs:
   build-structure:
-    if: >
-      contains(github.event.issue.labels.*.name, 'type:project')
+    if: github.event_name == 'issues' && contains(toJson(github.event.issue.labels.*.name), 'project')
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout (para ler arquivos de estrutura)
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Instalar gh CLI
-        uses: cli/gh-actions/install-gh@v1
-
-      - name: Logar no GitHub (usa GITHUB_TOKEN)
-        run: gh auth setup-git
-
-      - name: Preparar variáveis
+      - name: Create default phases and tasks
         id: prep
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           ISSUE_NUMBER="${{ github.event.issue.number }}"
           REPO="${{ github.repository }}"
-          TITLE="${{ github.event.issue.title }}"
-          # Carrega do form (payload) ou do arquivo
-          PHASES="$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | awk '/Phases/ {flag=1;next} /Tasks padrão/ {flag=0} flag')"
-          TASKS="$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | awk '/Tasks padrão/ {flag=1;next} /^$/ {flag=0} flag')"
-
-          if [ -z "$PHASES" ] || [ -z "$TASKS" ]; then
-            PHASES="$(yq -r '.phases[]' .github/issue-structure.yml)"
-            TASKS="$(yq -r '.tasks[]'  .github/issue-structure.yml)"
-          fi
-
+          
+          # Define default phases
+          PHASES="P1 - Charter Creation and Project Kickoff
+          P2 - Insight Gathering
+          P3 - Insight Review
+          P4 - Analytics & Integration Project Handoff Meeting
+          P5 - Analytics Work
+          P6 - Integration Work
+          P7 - PoC Design Review (Product and Integration)
+          P8 - Analytics Work for Production
+          P9 - Integration
+          PR - Recognition"
+          
           echo "phases<<EOF" >> $GITHUB_OUTPUT
-          echo "$PHASES"        >> $GITHUB_OUTPUT
-          echo "EOF"             >> $GITHUB_OUTPUT
-
-          echo "tasks<<EOF"  >> $GITHUB_OUTPUT
-          echo "$TASKS"      >> $GITHUB_OUTPUT
-          echo "EOF"          >> $GITHUB_OUTPUT
-
+          echo "$PHASES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
           echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
-          echo "repo=$REPO"                 >> $GITHUB_OUTPUT
+          echo "repo=$REPO" >> $GITHUB_OUTPUT
+          
+          # Define tasks per phase (format: PHASE_ID|Task1|Task2|Task3)
+          cat > phase_tasks.txt << 'TASKS_EOF'
+          P1|Charter document creation|P1.1 - Insight - Reach out to idea submitter and document a high level understanding of the project|P1.2 - Insight -  Document the charter (Project level task) with the template details|P1.3 - Insight - Set up meeting with I&S team to discuss the project, focusing on building an understanding of the questions that need to be asked during the insight interviews
+          P2|Requirements gathering|P2.1 - Insight - Reach out to focus group, asking them the questions defined on P1|P2.2 - Insight - Document the info into a summary presentation
+          P3|Review documentation|P3.1 - Insight - Set up meeting with I&S team to discuss the summary presentation|P3.2 - Insight - Reach out to focus group requesting more info if needed|P3.3 - Insight - Formally present Insight project findings to the focus group
+          P4|Technical handoff|P4.1 - Insight - Set up meeting with I&S team to present project documentation|P4.2 - Analytics - During the meeting, create the analytics tasks needed to be completed as part of project development|P4.3 - Integration - During the meeting, identify the impacted audience of the product (P9) and creating the integration tasks for P6
+          P7|PoC design preparation|P7.1 - Insight - Set up meeting with I&S team to review the product and align on Integration tasks|P7.2 - Insight - Set up Design Review meeting with the focus group to review the product and align on Integration tasks
+          P9|Integration testing|P9.1 - Marketing Materials|P9.2 - Training Class|P9.3 - User Feedback|P9.4 - Measure the Value
+          TASKS_EOF
 
-      - name: Criar Phases (issues filhos)
+      - name: Create labels if they don't exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REPO="${{ github.repository }}"
+          
+          # Create phase label if it doesn't exist
+          gh label create "phase" --color "0052CC" --description "Phase issue" --repo "$REPO" --force || true
+          
+          # Create task label if it doesn't exist
+          gh label create "task" --color "1D76DB" --description "Task issue" --repo "$REPO" --force || true
+
+      - name: Create Phase issues
         id: create_phases
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PARENT="${{ steps.prep.outputs.issue_number }}"
-          mapfile -t PHASES < <(printf "%s\n" "${{ steps.prep.outputs.phases }}")
+          
+          echo "Creating phase issues for parent #$PARENT"
           echo "" > phases_map.txt
-
-          for PH in "${PHASES[@]}"; do
-            PHASE_NUM=$(gh issue create \
-              --repo "$REPO" \
-              --title "[Phase] $PH" \
-              --label "phase" \
-              --body "Phase do projeto: #$PARENT" \
-              --json number \
-              | jq -r '.number')
-
-            echo "$PH:$PHASE_NUM" >> phases_map.txt
-          done
-
+          
+          while IFS= read -r PH; do
+            if [ -n "$PH" ]; then
+              echo "Creating phase: $PH"
+              PHASE_NUM=$(gh issue create \
+                --repo "$REPO" \
+                --title "[Phase] $PH" \
+                --label "phase" \
+                --body "Phase of project #$PARENT" \
+                | grep -oP '#\K[0-9]+' | head -1)
+              
+              echo "$PH|||$PHASE_NUM" >> phases_map.txt
+              echo "Created phase #$PHASE_NUM: $PH"
+            fi
+          done <<< "${{ steps.prep.outputs.phases }}"
+          
           echo "phases_map<<EOF" >> $GITHUB_OUTPUT
-          cat phases_map.txt       >> $GITHUB_OUTPUT
-          echo "EOF"               >> $GITHUB_OUTPUT
+          cat phases_map.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Criar Tasks para cada Phase
+      - name: Create Task issues for each Phase
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
-          mapfile -t TASKS < <(printf "%s\n" "${{ steps.prep.outputs.tasks }}")
-          while IFS=':' read -r PH_NAME PH_NUM; do
-            for TK in "${TASKS[@]}"; do
-              TASK_NUM=$(gh issue create \
-                --repo "$REPO" \
-                --title "[Task] $PH_NAME - $TK" \
-                --label "task" \
-                --body "Task da phase: #$PH_NUM" \
-                --json number | jq -r '.number')
-
-              # Relacionar via issue task list na Phase
-              gh issue edit "$PH_NUM" --repo "$REPO" --add-body "- [ ] #$TASK_NUM"
-            done
+          
+          while IFS='|||' read -r PH_NAME PH_NUM; do
+            if [ -n "$PH_NAME" ] && [ -n "$PH_NUM" ]; then
+              # Extract phase ID (P1, P2, etc.)
+              PHASE_ID=$(echo "$PH_NAME" | grep -oP '^P[0-9]+|^PR')
+              
+              # Check if this phase has tasks defined
+              if grep -q "^$PHASE_ID|" phase_tasks.txt; then
+                echo "Creating tasks for phase #$PH_NUM: $PH_NAME"
+                
+                # Get tasks for this phase
+                PHASE_TASKS=$(grep "^$PHASE_ID|" phase_tasks.txt | cut -d'|' -f2-)
+                
+                IFS='|' read -ra TASKS <<< "$PHASE_TASKS"
+                for TK in "${TASKS[@]}"; do
+                  if [ -n "$TK" ]; then
+                    echo "Creating task: $TK"
+                    TASK_NUM=$(gh issue create \
+                      --repo "$REPO" \
+                      --title "[Task] $PHASE_ID - $TK" \
+                      --label "task" \
+                      --body "Task for phase #$PH_NUM" \
+                      | grep -oP '#\K[0-9]+' | head -1)
+                    
+                    echo "Created task #$TASK_NUM"
+                    
+                    # Add task to phase's task list
+                    gh issue comment "$PH_NUM" --repo "$REPO" --body "- [ ] #$TASK_NUM $TK"
+                  fi
+                done
+              else
+                echo "No standard tasks for phase #$PH_NUM: $PH_NAME"
+              fi
+            fi
           done < phases_map.txt
 
-      - name: Montar task list no issue Projeto (referenciando Phases)
+      - name: Add phase checklist to parent project issue
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PARENT="${{ steps.prep.outputs.issue_number }}"
-          BODY="### Phases\n"
-          while IFS=':' read -r PH_NAME PH_NUM; do
-            BODY+="- [ ] #$PH_NUM ($PH_NAME)\n"
+          
+          BODY="### Project Phases"$'\n'
+          while IFS='|||' read -r PH_NAME PH_NUM; do
+            if [ -n "$PH_NAME" ] && [ -n "$PH_NUM" ]; then
+              BODY+="- [ ] #$PH_NUM - $PH_NAME"$'\n'
+            fi
           done < phases_map.txt
-
-          gh issue edit "$PARENT" --repo "$REPO" --add-body "$BODY"
+          
+          gh issue comment "$PARENT" --repo "$REPO" --body "$BODY"
+          echo "Project structure created successfully!"
