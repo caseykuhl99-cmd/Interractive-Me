@@ -103,9 +103,6 @@ jobs:
               
               PHASE_NUM=$(echo "$PHASE_URL" | grep -oP '[0-9]+$')
               
-              # Link phase as development item to parent
-              gh issue develop "$PARENT" --repo "$REPO" --issue-repo "$REPO" "$PHASE_NUM" || true
-              
               echo "$PH|$PHASE_NUM" >> phases_map.txt
               echo "Created phase #$PHASE_NUM: $PH"
             fi
@@ -156,9 +153,6 @@ jobs:
                       echo "Created task #$TASK_NUM: $TK"
                       
                       if [ -n "$TASK_NUM" ]; then
-                        # Link task as development item to phase
-                        gh issue develop "$PH_NUM" --repo "$REPO" --issue-repo "$REPO" "$TASK_NUM" || true
-                        
                         # Add to tasklist
                         TASK_LIST+="- [ ] #$TASK_NUM $TK"$'\n'
                       else
