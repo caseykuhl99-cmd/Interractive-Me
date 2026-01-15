@@ -3,7 +3,7 @@ name: Create Project Issue Structure
 
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened]
   workflow_dispatch:
 
 permissions:
@@ -33,10 +33,10 @@ jobs:
       - name: Create default phases and tasks
         id: prep
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         run: |
           # Use test issue number for workflow_dispatch, actual issue number for issue events
-          ISSUE_NUMBER="${{ github.event.issue.number || '13' }}"
+          ISSUE_NUMBER="${{ github.event.issue.number || '93' }}"
           REPO="${{ github.repository }}"
           
           # Define default phases
@@ -60,18 +60,18 @@ jobs:
           
           # Define tasks per phase (format: PHASE_ID|Task1|Task2|Task3)
           cat > phase_tasks.txt << 'TASKS_EOF'
-          P1|Charter document creation|P1.1 - Insight: Reach out to idea submitter and document a high level understanding of the project|P1.2 - Insight: Document the charter (Project level task) with the template details|P1.3 - Insight: Set up meeting with I&S team to discuss the project, focusing on building an understanding of the questions that need to be asked during the insight interviews
-          P2|Requirements gathering|P2.1 - Insight: Reach out to focus group, asking them the questions defined on P1|P2.2 - Insight: Document the info into a summary presentation
-          P3|Review documentation|P3.1 - Insight: Set up meeting with I&S team to discuss the summary presentation|P3.2 - Insight: Reach out to focus group requesting more info if needed|P3.3 - Insight: Formally present Insight project findings to the focus group
-          P4|Technical handoff|P4.1 - Insight: Set up meeting with I&S team to present project documentation|P4.2 - Analytics: During the meeting, create the analytics tasks needed to be completed as part of project development|P4.3 - Integration: During the meeting, identify the impacted audience of the product (P9) and creating the integration tasks for P6
-          P7|PoC design preparation|P7.1 - Insight: Set up meeting with I&S team to review the product and align on Integration tasks|P7.2 - Insight: Set up Design Review meeting with the focus group to review the product and align on Integration tasks
-          P9|Integration testing|P9.1 - Marketing Materials|P9.2 - Training Class|P9.3 - User Feedback|P9.4 - Measure the Value
+          P1|P1.1 - Insight: Reach out to idea submitter and document a high level understanding of the project|P1.2 - Insight: Document the charter (Project level task) with the template details|P1.3 - Insight: Set up meeting with I&S team to discuss the project, focusing on building an understanding of the questions that need to be asked during the insight interviews
+          P2|P2.1 - Insight: Reach out to focus group, asking them the questions defined on P1|P2.2 - Insight: Document the info into a summary presentation
+          P3|P3.1 - Insight: Set up meeting with I&S team to discuss the summary presentation|P3.2 - Insight: Reach out to focus group requesting more info if needed|P3.3 - Insight: Formally present Insight project findings to the focus group
+          P4|P4.1 - Insight: Set up meeting with I&S team to present project documentation|P4.2 - Analytics: During the meeting, create the analytics tasks needed to be completed as part of project development|P4.3 - Integration: During the meeting, identify the impacted audience of the product (P9) and creating the integration tasks for P6
+          P7|P7.1 - Insight: Set up meeting with I&S team to review the product and align on Integration tasks|P7.2 - Insight: Set up Design Review meeting with the focus group to review the product and align on Integration tasks
+          P9|P9.1 - Marketing Materials|P9.2 - Training Class|P9.3 - User Feedback|P9.4 - Measure the Value
           TASKS_EOF
           cat phase_tasks.txt
 
       - name: Create labels if they don't exist
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         run: |
           REPO="${{ github.repository }}"
           
@@ -81,16 +81,84 @@ jobs:
           # Create task label if it doesn't exist
           gh label create "task" --color "1D76DB" --description "Task issue" --repo "$REPO" --force || true
 
+      - name: Get Project information
+        id: project_info
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          REPO_OWNER="$(echo ${{ github.repository }} | cut -d'/' -f1)"
+          PROJECT_NUMBER="604"
+          
+          # Get project node ID and parent field ID
+          PROJECT_DATA=$(gh api graphql -f query='
+            query($owner: String!, $number: Int!) {
+              user(login: $owner) {
+                projectV2(number: $number) {
+                  id
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2FieldCommon {
+                        id
+                        name
+                      }
+                    }
+                  }
+                }
+              }
+              organization(login: $owner) {
+                projectV2(number: $number) {
+                  id
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2FieldCommon {
+                        id
+                        name
+                      }
+                    }
+                  }
+                }
+              }
+            }' -f owner="$REPO_OWNER" -F number="$PROJECT_NUMBER")
+          
+          # Try to get project ID from user or organization
+          PROJECT_ID=$(echo "$PROJECT_DATA" | jq -r '.data.user.projectV2.id // .data.organization.projectV2.id // empty')
+          
+          if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
+            echo "Error: Could not find project #$PROJECT_NUMBER"
+            exit 1
+          fi
+          
+          # Get the Parent field ID
+          PARENT_FIELD_ID=$(echo "$PROJECT_DATA" | jq -r '(.data.user.projectV2.fields.nodes // .data.organization.projectV2.fields.nodes) | .[] | select(.name == "Parent") | .id')
+          
+          echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+          echo "parent_field_id=$PARENT_FIELD_ID" >> $GITHUB_OUTPUT
+          echo "Project ID: $PROJECT_ID"
+          echo "Parent Field ID: $PARENT_FIELD_ID"
+
       - name: Create Phase issues
         id: create_phases
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PARENT="${{ steps.prep.outputs.issue_number }}"
+          PROJECT_ID="${{ steps.project_info.outputs.project_id }}"
+          PARENT_FIELD_ID="${{ steps.project_info.outputs.parent_field_id }}"
           
           echo "Creating phase issues for parent #$PARENT"
           echo "" > phases_map.txt
+          
+          # Get parent issue node ID and add to project
+          PARENT_NODE_ID=$(gh api repos/$REPO/issues/$PARENT --jq .node_id)
+          PARENT_ITEM_RESULT=$(gh api graphql -f query='
+            mutation($projectId: ID!, $contentId: ID!) {
+              addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                item { id }
+              }
+            }' -f projectId="$PROJECT_ID" -f contentId="$PARENT_NODE_ID")
+          PARENT_ITEM_ID=$(echo "$PARENT_ITEM_RESULT" | jq -r '.data.addProjectV2ItemById.item.id')
+          echo "Added parent issue #$PARENT to project (Item ID: $PARENT_ITEM_ID)"
           
           while IFS= read -r PH; do
             if [ -n "$PH" ]; then
@@ -103,7 +171,36 @@ jobs:
               
               PHASE_NUM=$(echo "$PHASE_URL" | grep -oP '[0-9]+$')
               
-              echo "$PH|$PHASE_NUM" >> phases_map.txt
+              # Get phase node ID
+              PHASE_NODE_ID=$(gh api repos/$REPO/issues/$PHASE_NUM --jq .node_id)
+              
+              # Add phase to project
+              PHASE_ITEM_RESULT=$(gh api graphql -f query='
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                    item { id }
+                  }
+                }' -f projectId="$PROJECT_ID" -f contentId="$PHASE_NODE_ID")
+              PHASE_ITEM_ID=$(echo "$PHASE_ITEM_RESULT" | jq -r '.data.addProjectV2ItemById.item.id')
+              
+              # Set parent relationship if parent field exists
+              if [ -n "$PARENT_FIELD_ID" ] && [ "$PARENT_FIELD_ID" != "null" ]; then
+                gh api graphql -f query='
+                  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $projectId
+                      itemId: $itemId
+                      fieldId: $fieldId
+                      value: $value
+                    }) {
+                      projectV2Item { id }
+                    }
+                  }' -f projectId="$PROJECT_ID" -f itemId="$PHASE_ITEM_ID" -f fieldId="$PARENT_FIELD_ID" \
+                  -f value="{\"issueId\":\"$PARENT_ITEM_ID\"}"
+                echo "Set parent relationship: Phase #$PHASE_NUM -> Project #$PARENT"
+              fi
+              
+              echo "$PH|$PHASE_NUM|$PHASE_ITEM_ID" >> phases_map.txt
               echo "Created phase #$PHASE_NUM: $PH"
             fi
           done <<< "${{ steps.prep.outputs.phases }}"
@@ -115,13 +212,15 @@ jobs:
 
       - name: Create Task issues for each Phase
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
+          PROJECT_ID="${{ steps.project_info.outputs.project_id }}"
+          PARENT_FIELD_ID="${{ steps.project_info.outputs.parent_field_id }}"
           
-          while IFS='|' read -r PH_NAME PH_NUM; do
+          while IFS='|' read -r PH_NAME PH_NUM PH_ITEM_ID; do
             if [ -z "$PH_NAME" ] || [ -z "$PH_NUM" ]; then
-              echo "Skipping invalid line: $PH_NAME|$PH_NUM"
+              echo "Skipping invalid line: $PH_NAME|$PH_NUM|$PH_ITEM_ID"
               continue
             fi
               if [ -n "$PH_NAME" ] && [ -n "$PH_NUM" ]; then
@@ -143,7 +242,7 @@ jobs:
                       echo "Creating task: $TK"
                       TASK_URL=$(gh issue create \
                         --repo "$REPO" \
-                        --title "[Task] $PHASE_ID - $TK" \
+                        --title "[Task] $TK" \
                         --label "task" \
                         --body "**Parent Phase:** #$PH_NUM"$'\n\n'"$TK")
                       
@@ -153,6 +252,35 @@ jobs:
                       echo "Created task #$TASK_NUM: $TK"
                       
                       if [ -n "$TASK_NUM" ]; then
+                        # Get task node ID
+                        TASK_NODE_ID=$(gh api repos/$REPO/issues/$TASK_NUM --jq .node_id)
+                        
+                        # Add task to project
+                        TASK_ITEM_RESULT=$(gh api graphql -f query='
+                          mutation($projectId: ID!, $contentId: ID!) {
+                            addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                              item { id }
+                            }
+                          }' -f projectId="$PROJECT_ID" -f contentId="$TASK_NODE_ID")
+                        TASK_ITEM_ID=$(echo "$TASK_ITEM_RESULT" | jq -r '.data.addProjectV2ItemById.item.id')
+                        
+                        # Set parent relationship if parent field exists
+                        if [ -n "$PARENT_FIELD_ID" ] && [ "$PARENT_FIELD_ID" != "null" ] && [ -n "$PH_ITEM_ID" ]; then
+                          gh api graphql -f query='
+                            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                              updateProjectV2ItemFieldValue(input: {
+                                projectId: $projectId
+                                itemId: $itemId
+                                fieldId: $fieldId
+                                value: $value
+                              }) {
+                                projectV2Item { id }
+                              }
+                            }' -f projectId="$PROJECT_ID" -f itemId="$TASK_ITEM_ID" -f fieldId="$PARENT_FIELD_ID" \
+                            -f value="{\"issueId\":\"$PH_ITEM_ID\"}"
+                          echo "Set parent relationship: Task #$TASK_NUM -> Phase #$PH_NUM"
+                        fi
+                        
                         # Add to tasklist
                         TASK_LIST+="- [ ] #$TASK_NUM $TK"$'\n'
                       else
@@ -176,7 +304,7 @@ jobs:
           cat phases_map.txt
       - name: Update parent project issue with phase tasklist
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PARENT="${{ steps.prep.outputs.issue_number }}"
@@ -186,7 +314,7 @@ jobs:
           
           # Build phase tasklist
           PHASE_LIST="### Project Phases"$'\n'
-          while IFS='|' read -r PH_NAME PH_NUM; do
+          while IFS='|' read -r PH_NAME PH_NUM PH_ITEM_ID; do
             if [ -n "$PH_NAME" ] && [ -n "$PH_NUM" ]; then
               PHASE_LIST+="- [ ] #$PH_NUM - $PH_NAME"$'\n'
             fi
@@ -196,4 +324,4 @@ jobs:
           NEW_BODY="$CURRENT_BODY"$'\n\n'"$PHASE_LIST"
           
           echo "$NEW_BODY" | gh issue edit "$PARENT" --repo "$REPO" --body-file -
-          echo "Project structure created successfully!"
+          echo "Project structure created successfully with parent-child relationships in Project #604!"
