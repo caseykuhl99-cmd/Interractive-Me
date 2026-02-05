@@ -20,3 +20,4 @@ content:
         models:
         - modelId: gpt-4o-mini-2024-07-18 # any of the models available to use (refer to the spec).
         - modelId: gpt-4o-2024-11-20
+        - modelId: gpt-5.2-2025-12-11
