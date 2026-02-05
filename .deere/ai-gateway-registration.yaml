@@ -6,7 +6,7 @@ metadata:
 content:
   spec:
     compliance:
-      generativeAITermsOfUseRevision: APR2025 # See https://data.deere.com/ai/legal to make sure you understand the terms of use.
+      generativeAITermsOfUseRevision: NOV2025 # See https://data.deere.com/ai/legal to make sure you understand the terms of use.
       compliesWithGenerativeAITermsOfUse: yes
     description:  Use AI to author DTCs. We will use AI to processing information from code to generate DTCs automatically, which will speed up the process for the support. # verbose description of your application and usage of AI for data processing.
     maxGicpClassification: Company Use # highest level of GICP you plan to use with AI.
@@ -20,3 +20,4 @@ content:
         models:
         - modelId: gpt-4o-mini-2024-07-18 # any of the models available to use (refer to the spec).
         - modelId: gpt-4o-2024-11-20
+        - modelId: gpt-5.2-2025-12-11
