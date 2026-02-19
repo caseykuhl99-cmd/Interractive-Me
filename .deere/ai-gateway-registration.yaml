@@ -23,4 +23,4 @@ content:
         - modelId: gpt-5.2-2025-12-11
       - provider: anthropic
         models:
-        - modelId: claude-sonnet-4-5-20250929 # any of the models available to use (refer to the spec).
+        - modelId: claude-sonnet-4-20250514 # any of the models available to use (refer to the spec).
