@@ -1,0 +1,7 @@
+# GitHub Actions local testing
+.secrets
+.env
+test-event.json
+
+# Logs
+*.log
