@@ -24,3 +24,4 @@ content:
       - provider: anthropic
         models:
         - modelId: claude-sonnet-4-20250514 # any of the models available to use (refer to the spec).
+        - modelId: claude-opus-4-6-v1 # any of the models available to use (refer to the spec).
