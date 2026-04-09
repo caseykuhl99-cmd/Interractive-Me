@@ -5,6 +5,11 @@ on:
   issues:
     types: [opened]
 
+env:
+  # Optional: Set this to your GitHub Project (V2) number if you want to link issues to a project board
+  # Leave empty or unset to skip project board integration
+  GITHUB_PROJECT_NUMBER: ""
+
 permissions:
   issues: write
   contents: read
@@ -87,7 +92,17 @@ jobs:
           GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         run: |
           REPO_OWNER="$(echo ${{ github.repository }} | cut -d'/' -f1)"
-          PROJECT_NUMBER="604"
+          PROJECT_NUMBER="${{ env.GITHUB_PROJECT_NUMBER }}"
+          
+          # Skip project integration if PROJECT_NUMBER is not set
+          if [ -z "$PROJECT_NUMBER" ]; then
+            echo "⚠️  GITHUB_PROJECT_NUMBER not set - skipping project board integration"
+            echo "   Issues will be created but not linked to a project board"
+            echo "project_id=" >> $GITHUB_OUTPUT
+            echo "parent_field_id=" >> $GITHUB_OUTPUT
+            echo "skip_project=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           
           echo "Looking for project #$PROJECT_NUMBER for owner: $REPO_OWNER"
           
@@ -136,9 +151,13 @@ jobs:
           fi
           
           if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
-            echo "Error: Could not find project #$PROJECT_NUMBER for $REPO_OWNER"
-            echo "Make sure the project exists and PROJECT_TOKEN has access to it"
-            exit 1
+            echo "⚠️  Warning: Could not find project #$PROJECT_NUMBER for $REPO_OWNER"
+            echo "   Issues will be created but not linked to project board"
+            echo "   Make sure the project exists and PROJECT_TOKEN has access to it"
+            echo "project_id=" >> $GITHUB_OUTPUT
+            echo "parent_field_id=" >> $GITHUB_OUTPUT
+            echo "skip_project=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
           
           # Get the Parent field ID (look for "Parent issue" or "Parent")
@@ -165,6 +184,44 @@ jobs:
             echo ""
           fi
 
+      - name: Create or get milestone from project issue
+        id: milestone
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          REPO="${{ steps.prep.outputs.repo }}"
+          PARENT="${{ steps.prep.outputs.project_number }}"
+          
+          echo "Getting project issue title for milestone..."
+          
+          # Get the project issue title
+          PROJECT_TITLE=$(gh issue view "$PARENT" --repo "$REPO" --json title --jq .title)
+          
+          if [ -z "$PROJECT_TITLE" ]; then
+            echo "⚠️  Could not get project issue title, skipping milestone creation"
+            echo "milestone_title=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Project title: $PROJECT_TITLE"
+          
+          # Check if milestone already exists
+          EXISTING_MILESTONE=$(gh api repos/$REPO/milestones --jq ".[] | select(.title == \"$PROJECT_TITLE\") | .title" 2>/dev/null || echo "")
+          
+          if [ -n "$EXISTING_MILESTONE" ]; then
+            echo "✓ Milestone already exists: $PROJECT_TITLE"
+          else
+            echo "Creating milestone: $PROJECT_TITLE"
+            gh api repos/$REPO/milestones -f title="$PROJECT_TITLE" -f state=open || {
+              echo "⚠️  Could not create milestone, continuing without it"
+              echo "milestone_title=" >> $GITHUB_OUTPUT
+              exit 0
+            }
+            echo "✓ Milestone created: $PROJECT_TITLE"
+          fi
+          
+          echo "milestone_title=$PROJECT_TITLE" >> $GITHUB_OUTPUT
+
       - name: Create Phase issues
         id: create_phases
         env:
@@ -174,6 +231,8 @@ jobs:
           PARENT="${{ steps.prep.outputs.project_number }}"
           PROJECT_ID="${{ steps.project_info.outputs.project_id }}"
           PARENT_FIELD_ID="${{ steps.project_info.outputs.parent_field_id }}"
+          SKIP_PROJECT="${{ steps.project_info.outputs.skip_project }}"
+          MILESTONE_TITLE="${{ steps.milestone.outputs.milestone_title }}"
           
           echo "Creating phase issues for parent #$PARENT"
           # Initialize empty phases_map.txt (no content, not even empty line)
@@ -183,8 +242,13 @@ jobs:
           PARENT_NODE_ID=$(gh api repos/$REPO/issues/$PARENT --jq .node_id)
           echo "Parent Node ID: $PARENT_NODE_ID"
           
-          # Try to add parent to project (may fail if already added or insufficient permissions)
-          echo "Adding parent issue #$PARENT to project..."
+          # Skip project operations if project integration is disabled
+          if [ "$SKIP_PROJECT" = "true" ] || [ -z "$PROJECT_ID" ]; then
+            echo "⚠️  Skipping project board integration (not configured or unavailable)"
+            PARENT_ITEM_ID="skip"
+          else
+            # Try to add parent to project (may fail if already added or insufficient permissions)
+            echo "Adding parent issue #$PARENT to project..."
           PARENT_ITEM_RESULT=$(gh api graphql -f query='
             mutation($projectId: ID!, $contentId: ID!) {
               addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
@@ -227,15 +291,26 @@ jobs:
           else
             echo "Added parent issue #$PARENT to project (Item ID: $PARENT_ITEM_ID)"
           fi
+          fi
           
           while IFS= read -r PH; do
             if [ -n "$PH" ]; then
               echo "Creating phase: $PH"
-              PHASE_URL=$(gh issue create \
-                --repo "$REPO" \
-                --title "[Phase] $PH" \
-                --label "phase" \
-                --body "**Parent Project:** #$PARENT"$'\n\n'"### Tasks"$'\n'"This phase includes the following tasks:" 2>&1)
+              # Create issue with milestone if available
+              if [ -n "$MILESTONE_TITLE" ]; then
+                PHASE_URL=$(gh issue create \
+                  --repo "$REPO" \
+                  --title "[Phase] $PH" \
+                  --label "phase" \
+                  --milestone "$MILESTONE_TITLE" \
+                  --body "**Parent Project:** #$PARENT"$'\n\n'"### Tasks"$'\n'"This phase includes the following tasks:" 2>&1)
+              else
+                PHASE_URL=$(gh issue create \
+                  --repo "$REPO" \
+                  --title "[Phase] $PH" \
+                  --label "phase" \
+                  --body "**Parent Project:** #$PARENT"$'\n\n'"### Tasks"$'\n'"This phase includes the following tasks:" 2>&1)
+              fi
               
               if [[ "$PHASE_URL" == *"http"* ]]; then
                 PHASE_NUM=$(echo "$PHASE_URL" | grep -oP '[0-9]+$')
@@ -253,6 +328,8 @@ jobs:
               # Get phase node ID
               PHASE_NODE_ID=$(gh api repos/$REPO/issues/$PHASE_NUM --jq .node_id)
               
+              # Add phase to project (skip if project integration disabled)
+              if [ "$SKIP_PROJECT" != "true" ] && [ -n "$PROJECT_ID" ]; then
               # Add phase to project
               PHASE_ITEM_RESULT=$(gh api graphql -f query='
                 mutation($projectId: ID!, $contentId: ID!) {
@@ -265,6 +342,10 @@ jobs:
               if [ -z "$PHASE_ITEM_ID" ] || [ "$PHASE_ITEM_ID" = "null" ] || [ "$PHASE_ITEM_ID" = "error" ]; then
                 echo "Warning: Could not add phase to project. Skipping parent relationship."
                 PHASE_ITEM_ID="unknown"
+              fi
+              else
+                echo "Skipping project board linking (not configured)"
+                PHASE_ITEM_ID="skip"
               fi
               
               # Create parent-child relationship using GitHub's sub-issues API
@@ -323,6 +404,8 @@ jobs:
           PROJECT_ID="${{ steps.project_info.outputs.project_id }}"
           PARENT_FIELD_ID="${{ steps.project_info.outputs.parent_field_id }}"
           PROJECT_ISSUE="${{ steps.prep.outputs.project_number }}"
+          SKIP_PROJECT="${{ steps.project_info.outputs.skip_project }}"
+          MILESTONE_TITLE="${{ steps.milestone.outputs.milestone_title }}"
           
           while IFS='|' read -r PH_NAME PH_NUM PH_ITEM_ID PH_NODE_ID; do
             if [ -z "$PH_NAME" ] || [ -z "$PH_NUM" ]; then
@@ -346,11 +429,21 @@ jobs:
                   for TK in "${TASKS[@]}"; do
                     if [ -n "$TK" ]; then
                       echo "Creating task: $TK"
-                      TASK_URL=$(gh issue create \
-                        --repo "$REPO" \
-                        --title "[Task] $TK" \
-                        --label "task" \
-                        --body "**Parent Phase:** #$PH_NUM"$'\n\n'"$TK" 2>&1)
+                      # Create task with milestone if available
+                      if [ -n "$MILESTONE_TITLE" ]; then
+                        TASK_URL=$(gh issue create \
+                          --repo "$REPO" \
+                          --title "[Task] $TK" \
+                          --label "task" \
+                          --milestone "$MILESTONE_TITLE" \
+                          --body "**Parent Phase:** #$PH_NUM"$'\n\n'"$TK" 2>&1)
+                      else
+                        TASK_URL=$(gh issue create \
+                          --repo "$REPO" \
+                          --title "[Task] $TK" \
+                          --label "task" \
+                          --body "**Parent Phase:** #$PH_NUM"$'\n\n'"$TK" 2>&1)
+                      fi
                       
                       if [[ "$TASK_URL" == *"http"* ]]; then
                         # Extract the task number from the URL
@@ -368,6 +461,8 @@ jobs:
                         # Get task node ID
                         TASK_NODE_ID=$(gh api repos/$REPO/issues/$TASK_NUM --jq .node_id)
                         
+                        # Add task to project (skip if project integration disabled)
+                        if [ "$SKIP_PROJECT" != "true" ] && [ -n "$PROJECT_ID" ]; then
                         # Add task to project
                         TASK_ITEM_RESULT=$(gh api graphql -f query='
                           mutation($projectId: ID!, $contentId: ID!) {
@@ -380,6 +475,10 @@ jobs:
                         if [ -z "$TASK_ITEM_ID" ] || [ "$TASK_ITEM_ID" = "null" ] || [ "$TASK_ITEM_ID" = "error" ]; then
                           echo "Warning: Could not add task to project. Skipping parent relationship."
                           TASK_ITEM_ID="unknown"
+                        fi
+                        else
+                          echo "Skipping project board linking (not configured)"
+                          TASK_ITEM_ID="skip"
                         fi
                         
                         # Create parent-child relationship using GitHub's sub-issues API
