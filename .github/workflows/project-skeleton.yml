@@ -184,6 +184,44 @@ jobs:
             echo ""
           fi
 
+      - name: Create or get milestone from project issue
+        id: milestone
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          REPO="${{ steps.prep.outputs.repo }}"
+          PARENT="${{ steps.prep.outputs.project_number }}"
+          
+          echo "Getting project issue title for milestone..."
+          
+          # Get the project issue title
+          PROJECT_TITLE=$(gh issue view "$PARENT" --repo "$REPO" --json title --jq .title)
+          
+          if [ -z "$PROJECT_TITLE" ]; then
+            echo "⚠️  Could not get project issue title, skipping milestone creation"
+            echo "milestone_title=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Project title: $PROJECT_TITLE"
+          
+          # Check if milestone already exists
+          EXISTING_MILESTONE=$(gh api repos/$REPO/milestones --jq ".[] | select(.title == \"$PROJECT_TITLE\") | .title" 2>/dev/null || echo "")
+          
+          if [ -n "$EXISTING_MILESTONE" ]; then
+            echo "✓ Milestone already exists: $PROJECT_TITLE"
+          else
+            echo "Creating milestone: $PROJECT_TITLE"
+            gh api repos/$REPO/milestones -f title="$PROJECT_TITLE" -f state=open || {
+              echo "⚠️  Could not create milestone, continuing without it"
+              echo "milestone_title=" >> $GITHUB_OUTPUT
+              exit 0
+            }
+            echo "✓ Milestone created: $PROJECT_TITLE"
+          fi
+          
+          echo "milestone_title=$PROJECT_TITLE" >> $GITHUB_OUTPUT
+
       - name: Create Phase issues
         id: create_phases
         env:
@@ -194,6 +232,7 @@ jobs:
           PROJECT_ID="${{ steps.project_info.outputs.project_id }}"
           PARENT_FIELD_ID="${{ steps.project_info.outputs.parent_field_id }}"
           SKIP_PROJECT="${{ steps.project_info.outputs.skip_project }}"
+          MILESTONE_TITLE="${{ steps.milestone.outputs.milestone_title }}"
           
           echo "Creating phase issues for parent #$PARENT"
           # Initialize empty phases_map.txt (no content, not even empty line)
@@ -257,11 +296,21 @@ jobs:
           while IFS= read -r PH; do
             if [ -n "$PH" ]; then
               echo "Creating phase: $PH"
-              PHASE_URL=$(gh issue create \
-                --repo "$REPO" \
-                --title "[Phase] $PH" \
-                --label "phase" \
-                --body "**Parent Project:** #$PARENT"$'\n\n'"### Tasks"$'\n'"This phase includes the following tasks:" 2>&1)
+              # Create issue with milestone if available
+              if [ -n "$MILESTONE_TITLE" ]; then
+                PHASE_URL=$(gh issue create \
+                  --repo "$REPO" \
+                  --title "[Phase] $PH" \
+                  --label "phase" \
+                  --milestone "$MILESTONE_TITLE" \
+                  --body "**Parent Project:** #$PARENT"$'\n\n'"### Tasks"$'\n'"This phase includes the following tasks:" 2>&1)
+              else
+                PHASE_URL=$(gh issue create \
+                  --repo "$REPO" \
+                  --title "[Phase] $PH" \
+                  --label "phase" \
+                  --body "**Parent Project:** #$PARENT"$'\n\n'"### Tasks"$'\n'"This phase includes the following tasks:" 2>&1)
+              fi
               
               if [[ "$PHASE_URL" == *"http"* ]]; then
                 PHASE_NUM=$(echo "$PHASE_URL" | grep -oP '[0-9]+$')
@@ -356,6 +405,7 @@ jobs:
           PARENT_FIELD_ID="${{ steps.project_info.outputs.parent_field_id }}"
           PROJECT_ISSUE="${{ steps.prep.outputs.project_number }}"
           SKIP_PROJECT="${{ steps.project_info.outputs.skip_project }}"
+          MILESTONE_TITLE="${{ steps.milestone.outputs.milestone_title }}"
           
           while IFS='|' read -r PH_NAME PH_NUM PH_ITEM_ID PH_NODE_ID; do
             if [ -z "$PH_NAME" ] || [ -z "$PH_NUM" ]; then
@@ -379,11 +429,21 @@ jobs:
                   for TK in "${TASKS[@]}"; do
                     if [ -n "$TK" ]; then
                       echo "Creating task: $TK"
-                      TASK_URL=$(gh issue create \
-                        --repo "$REPO" \
-                        --title "[Task] $TK" \
-                        --label "task" \
-                        --body "**Parent Phase:** #$PH_NUM"$'\n\n'"$TK" 2>&1)
+                      # Create task with milestone if available
+                      if [ -n "$MILESTONE_TITLE" ]; then
+                        TASK_URL=$(gh issue create \
+                          --repo "$REPO" \
+                          --title "[Task] $TK" \
+                          --label "task" \
+                          --milestone "$MILESTONE_TITLE" \
+                          --body "**Parent Phase:** #$PH_NUM"$'\n\n'"$TK" 2>&1)
+                      else
+                        TASK_URL=$(gh issue create \
+                          --repo "$REPO" \
+                          --title "[Task] $TK" \
+                          --label "task" \
+                          --body "**Parent Phase:** #$PH_NUM"$'\n\n'"$TK" 2>&1)
+                      fi
                       
                       if [[ "$TASK_URL" == *"http"* ]]; then
                         # Extract the task number from the URL
