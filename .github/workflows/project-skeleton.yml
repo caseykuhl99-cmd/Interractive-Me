@@ -13,6 +13,7 @@ env:
 permissions:
   issues: write
   contents: read
+  repository-projects: write
 
 jobs:
   build-structure:
@@ -36,7 +37,7 @@ jobs:
 
       - name: Create labels if they don't exist
         env:
-          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO="${{ github.repository }}"
           
@@ -89,7 +90,7 @@ jobs:
       - name: Get Project information
         id: project_info
         env:
-          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO_OWNER="$(echo ${{ github.repository }} | cut -d'/' -f1)"
           PROJECT_NUMBER="${{ env.GITHUB_PROJECT_NUMBER }}"
@@ -187,7 +188,7 @@ jobs:
       - name: Create or get milestone from project issue
         id: milestone
         env:
-          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PARENT="${{ steps.prep.outputs.project_number }}"
@@ -225,7 +226,7 @@ jobs:
       - name: Create Phase issues
         id: create_phases
         env:
-          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PARENT="${{ steps.prep.outputs.project_number }}"
@@ -398,7 +399,7 @@ jobs:
 
       - name: Create Task issues for each Phase
         env:
-          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PROJECT_ID="${{ steps.project_info.outputs.project_id }}"
@@ -542,7 +543,7 @@ jobs:
           cat phases_map.txt
       - name: Update parent project issue with phase tasklist
         env:
-          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO="${{ steps.prep.outputs.repo }}"
           PARENT="${{ steps.prep.outputs.project_number }}"
