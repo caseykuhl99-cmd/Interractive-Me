@@ -1,0 +1,68 @@
+name: "Project Template"
+description: "Template for new projects"
+title: "[Project]: <Enter project name here>"
+labels: ["project"]
+assignees:
+  - HP6NTKB_deere
+  - fl40274_deere
+  - rp32809_deere
+  - tc00531_deere
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please fill in the fields below:
+
+  - type: textarea
+    id: "opportunity_statement"
+    attributes:
+      label: "Opportunity Statement"
+      description: "Enter description of the opportunity"
+      placeholder: "e.g., Improve process X"
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: "Deliverable"
+      description: "What is the deliverable?"
+      placeholder: "e.g., Dashboard, report..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: hours_unlocked_by_role
+    attributes:
+      label: "Hours Unlocked per Year"
+      description: "Enter the hours unlocked per year for each role"
+      placeholder: "e.g., PL: 120, LTIS: 80, Engineer: 150"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reasoning
+    attributes:
+      label: "Reasoning"
+      description: "Explain the reason"
+      placeholder: "Why is this important?"
+    validations:
+      required: true
+
+  - type: input
+    id: focus_group
+    attributes:
+      label: "Focus Group"
+      description: "Focus group"
+      placeholder: "e.g., Data team"
+    validations:
+      required: false
+
+  - type: textarea
+    id: stakeholders
+    attributes:
+      label: "Project Stakeholders"
+      description: "Who are the stakeholders?"
+      placeholder: "e.g., Name1, Name2"
+    validations:
+      required: false

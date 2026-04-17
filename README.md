@@ -1,17 +1,4 @@
-# Casey Kuhl - Interactive Introduction & Resume
+# ETID-Innovation-AI
 
-An interactive, modern web-based professional portfolio and personal introduction.
+[![shields](https://badges.deere.com/endpoint?url=https://badge-inator.deere.com/shield/JohnDeere-Tech/ETID-Innovation-AI&token=4hrmz1pzNHhBYofKDt96sGi4N38kVTSU)](https://shield.deere.com/scorecard?org_name=JohnDeere-Tech&repo_name=ETID-Innovation-AI)
 
-## Live Site
-Visit: [https://ck71239-deere.github.io/Intro-and-Interactive-Resume/](https://ck71239-deere.github.io/Intro-and-Interactive-Resume/)
-
-## Features
-- **Interactive Career Timeline** - Click to expand each role
-- **Animated Skills Charts** - Skill bars and radar competency chart
-- **Photo Gallery** - Lightbox with keyboard navigation
-- **Impact Metrics** - Animated counter statistics
-- **Responsive Design** - Works on desktop, tablet, and mobile
-- **Modern UI** - Dark theme with John Deere-inspired green/gold accents
-
-## Deployment
-This site is designed for GitHub Pages. Simply enable Pages in your repository settings pointing to the `main` branch root.

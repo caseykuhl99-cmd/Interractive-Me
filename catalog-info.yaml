@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ETID-Innovation-AI
+  description: This repository contains innovation and efficiency related projects for the Enterprise Technical Information Development teams.
+  annotations:
+    github.com/project-slug: JohnDeere-Tech/ETID-Innovation-AI
+    backstage.io/source-template: template:default/create-shield-repository
+spec:
+  type: service
+  owner: group:default/etid-innovation-and-strategy
+  lifecycle: production
+  system: system:default/cpss_pit
