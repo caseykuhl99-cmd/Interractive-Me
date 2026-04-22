@@ -515,6 +515,23 @@ img {
     margin-bottom: 0.5rem;
 }
 
+.timeline-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.3rem;
+}
+
+.company-logo {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 3px;
+    flex-shrink: 0;
+}
+
 .timeline-card h3 {
     font-size: 1.1rem;
     color: var(--color-text-light);
