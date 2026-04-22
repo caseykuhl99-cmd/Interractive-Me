@@ -331,12 +331,8 @@ function initGallery() {
         { src: 'assets/images/pptx_image_6.png', large: true },
         { src: 'assets/images/pptx_image_7.png', large: false },
         { src: 'assets/images/pptx_image_8.png', large: false },
-        { src: 'assets/images/pptx_image_9.png', large: true },
-        { src: 'assets/images/pptx_image_10.png', large: false },
-        { src: 'assets/images/pptx_image_13.png', large: false },
-        { src: 'assets/images/pptx_image_14.png', large: true },
         { src: 'assets/images/pptx_image_19.png', large: false },
-        { src: 'assets/images/pptx_image_25.png', large: false },
+        { src: 'assets/images/pptx_image_25.png', large: true },
         { src: 'assets/images/pptx_image_26.png', large: true },
     ];
 
