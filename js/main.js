@@ -296,6 +296,7 @@ function initCounters() {
 
 function animateCounter(el) {
     const target = parseInt(el.getAttribute('data-target'));
+    const prefix = el.getAttribute('data-prefix') || '';
     const duration = 2000;
     const start = performance.now();
 
@@ -304,7 +305,7 @@ function animateCounter(el) {
         const progress = Math.min(elapsed / duration, 1);
         const eased = 1 - Math.pow(1 - progress, 3);
         const current = Math.round(target * eased);
-        el.textContent = current.toLocaleString();
+        el.textContent = prefix + current.toLocaleString();
         if (progress < 1) requestAnimationFrame(update);
     }
 
