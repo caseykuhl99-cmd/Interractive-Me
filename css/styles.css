@@ -105,6 +105,13 @@ img {
     letter-spacing: -0.5px;
 }
 
+.nav-qr {
+    width: 180px;
+    height: 180px;
+    border-radius: 8px;
+    margin-left: 1rem;
+}
+
 .nav-menu {
     display: flex;
     list-style: none;
