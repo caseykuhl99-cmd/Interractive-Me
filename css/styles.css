@@ -543,6 +543,17 @@ img {
     color: var(--color-text-muted);
 }
 
+.timeline-location {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    margin-top: 0.25rem;
+}
+
+.timeline-location i {
+    margin-right: 0.35rem;
+    color: var(--color-accent);
+}
+
 .timeline-details {
     max-height: 0;
     overflow: hidden;
