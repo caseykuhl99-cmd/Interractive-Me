@@ -261,7 +261,7 @@ function initRadarChart() {
         ctx.textAlign = 'center';
         for (let i = 0; i < numAxes; i++) {
             const angle = startAngle + angleStep * i;
-            const labelRadius = maxRadius + 50;
+            const labelRadius = maxRadius + 1;
             let x = centerX + labelRadius * Math.cos(angle);
             let y = centerY + labelRadius * Math.sin(angle);
 
