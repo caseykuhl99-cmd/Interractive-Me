@@ -154,7 +154,7 @@ function initRadarChart() {
 
     const centerX = size / 2;
     const centerY = size / 2;
-    const maxRadius = size / 2 - 100;
+    const maxRadius = size / 2 - 50;
 
     const labels = [
         'Technical Info Dev',
