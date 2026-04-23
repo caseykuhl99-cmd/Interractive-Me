@@ -145,7 +145,7 @@ function initRadarChart() {
 
     // High-DPI support
     const dpr = window.devicePixelRatio || 1;
-    const size = Math.min(canvas.parentElement.offsetWidth - 40, 500);
+    const size = Math.min(canvas.parentElement.offsetWidth - 40, 650);
     canvas.width = size * dpr;
     canvas.height = size * dpr;
     canvas.style.width = size + 'px';
