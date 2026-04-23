@@ -145,7 +145,7 @@ function initRadarChart() {
 
     // High-DPI support
     const dpr = window.devicePixelRatio || 1;
-    const size = Math.min(canvas.parentElement.offsetWidth - 40, 750);
+    const size = Math.min(canvas.parentElement.offsetWidth - 20, 850);
     canvas.width = size * dpr;
     canvas.height = size * dpr;
     canvas.style.width = size + 'px';
@@ -154,7 +154,7 @@ function initRadarChart() {
 
     const centerX = size / 2;
     const centerY = size / 2;
-    const maxRadius = size / 2 - 50;
+    const maxRadius = size / 2 - 150;
 
     const labels = [
         'Technical Info Dev',
@@ -257,11 +257,11 @@ function initRadarChart() {
 
         // Draw labels
         ctx.fillStyle = '#a0a0b0';
-        ctx.font = '13px Inter, sans-serif';
+        ctx.font = '12px Inter, sans-serif';
         ctx.textAlign = 'center';
         for (let i = 0; i < numAxes; i++) {
             const angle = startAngle + angleStep * i;
-            const labelRadius = maxRadius + 1;
+            const labelRadius = maxRadius + 18;
             let x = centerX + labelRadius * Math.cos(angle);
             let y = centerY + labelRadius * Math.sin(angle);
 

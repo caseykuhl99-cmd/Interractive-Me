@@ -710,8 +710,8 @@ img {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: 2.5rem;
-    max-width: 850px;
+    padding: 1rem;
+    max-width: 900px;
     margin: 0 auto;
     text-align: center;
 }
