@@ -257,11 +257,11 @@ function initRadarChart() {
 
         // Draw labels
         ctx.fillStyle = '#a0a0b0';
-        ctx.font = '12px Inter, sans-serif';
+        ctx.font = '13px Inter, sans-serif';
         ctx.textAlign = 'center';
         for (let i = 0; i < numAxes; i++) {
             const angle = startAngle + angleStep * i;
-            const labelRadius = maxRadius + 35;
+            const labelRadius = maxRadius + 50;
             let x = centerX + labelRadius * Math.cos(angle);
             let y = centerY + labelRadius * Math.sin(angle);
 
