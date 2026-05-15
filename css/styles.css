@@ -438,6 +438,18 @@ img {
     background: var(--color-bg-light);
 }
 
+.work-locations-map {
+    max-width: 700px;
+    margin: 1.5rem auto;
+    text-align: center;
+}
+
+.work-locations-map img {
+    width: 100%;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+}
+
 .timeline {
     position: relative;
     max-width: 900px;
