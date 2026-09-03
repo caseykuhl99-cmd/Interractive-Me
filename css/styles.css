@@ -788,6 +788,17 @@ img {
     background-clip: text;
 }
 
+.achievement-image {
+    margin-bottom: 1rem;
+}
+
+.achievement-image img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-sm);
+}
+
 .achievement-card h3 {
     font-size: 1.1rem;
     color: var(--color-text-light);
